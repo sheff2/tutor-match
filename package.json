@@ -1,0 +1,26 @@
+{
+  "name": "tutor-match",
+  "version": "1.0.0",
+  "description": "find and list tutoring services by course",
+  "main": "index.js",
+  "scripts": {
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "dev": "concurrently -n API,WEB -c blue,green \"npm:dev:server\" \"npm:dev:client\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sheff2/tutor-match.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sheff2/tutor-match/issues"
+  },
+  "homepage": "https://github.com/sheff2/tutor-match#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "private": true
+}
