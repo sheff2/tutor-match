@@ -1,42 +1,52 @@
 import { Link } from 'react-router-dom';
-
-// Sample tutor data - replace with API call later
-const tutors = [
-  {
-    id: 1,
-    name: 'Sarah Johnson',
-    courses: ['CS 101', 'CS 201'],
-    rating: 4.8,
-    hourlyRate: 25,
-    bio: 'Computer Science major with 2 years of tutoring experience.',
-  },
-  {
-    id: 2,
-    name: 'Michael Chen',
-    courses: ['MATH 150', 'MATH 250'],
-    rating: 4.9,
-    hourlyRate: 30,
-    bio: 'Math enthusiast helping students ace calculus and linear algebra.',
-  },
-  {
-    id: 3,
-    name: 'Emily Rodriguez',
-    courses: ['CHEM 101', 'CHEM 102'],
-    rating: 4.7,
-    hourlyRate: 28,
-    bio: 'Chemistry tutor passionate about making complex topics simple.',
-  },
-  {
-    id: 4,
-    name: 'David Kim',
-    courses: ['CS 301', 'CS 401'],
-    rating: 5.0,
-    hourlyRate: 35,
-    bio: 'Senior CS student specializing in algorithms and data structures.',
-  },
-];
+import { useState, useEffect } from 'react';
 
 export default function Tutors() {
+  const [tutors, setTutors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchTutors();
+  }, []);
+
+  const fetchTutors = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/tutors');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch tutors');
+      }
+      
+      const data = await response.json();
+      setTutors(data.results || []);
+    } catch (err) {
+      console.error('Error fetching tutors:', err);
+      setError(err.message);
+      // Fallback to sample data if API fails
+      setTutors([
+        {
+          id: 1,
+          name: 'Sarah Johnson',
+          courses: ['CS 101', 'CS 201'],
+          rating: 4.8,
+          hourlyRate: 25,
+          bio: 'Computer Science major with 2 years of tutoring experience.',
+        },
+        {
+          id: 2,
+          name: 'Michael Chen',
+          courses: ['MATH 150', 'MATH 250'],
+          rating: 4.9,
+          hourlyRate: 30,
+          bio: 'Math enthusiast helping students ace calculus and linear algebra.',
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div style={styles.page}>
       <header style={styles.header}>
@@ -55,35 +65,47 @@ export default function Tutors() {
             Browse available tutors and find the perfect match for your course.
           </p>
 
-          <div style={styles.grid}>
-            {tutors.map((tutor) => (
-              <div key={tutor.id} style={styles.card}>
-                <div style={styles.cardHeader}>
-                  <h3 style={styles.tutorName}>{tutor.name}</h3>
-                  <div style={styles.rating}>
-                    ⭐ {tutor.rating}
+          {loading && (
+            <div style={styles.loading}>Loading tutors...</div>
+          )}
+
+          {error && !loading && (
+            <div style={styles.error}>
+              {error} - Showing sample data instead.
+            </div>
+          )}
+
+          {!loading && (
+            <div style={styles.grid}>
+              {tutors.map((tutor) => (
+                <div key={tutor.id} style={styles.card}>
+                  <div style={styles.cardHeader}>
+                    <h3 style={styles.tutorName}>{tutor.name}</h3>
+                    <div style={styles.rating}>
+                      ⭐ {tutor.rating}
+                    </div>
+                  </div>
+                  
+                  <p style={styles.bio}>{tutor.bio}</p>
+                  
+                  <div style={styles.courses}>
+                    {tutor.courses && tutor.courses.map((course, idx) => (
+                      <span key={idx} style={styles.courseBadge}>
+                        {course}
+                      </span>
+                    ))}
+                  </div>
+                  
+                  <div style={styles.cardFooter}>
+                    <span style={styles.rate}>${tutor.hourlyRate}/hr</span>
+                    <button className="btn btn-primary" style={styles.bookBtn}>
+                      Book Session
+                    </button>
                   </div>
                 </div>
-                
-                <p style={styles.bio}>{tutor.bio}</p>
-                
-                <div style={styles.courses}>
-                  {tutor.courses.map((course, idx) => (
-                    <span key={idx} style={styles.courseBadge}>
-                      {course}
-                    </span>
-                  ))}
-                </div>
-                
-                <div style={styles.cardFooter}>
-                  <span style={styles.rate}>${tutor.hourlyRate}/hr</span>
-                  <button className="btn btn-primary" style={styles.bookBtn}>
-                    Book Session
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
 
@@ -151,6 +173,21 @@ const styles = {
     color: 'var(--muted)',
     textAlign: 'center',
     marginBottom: '40px',
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '40px',
+    fontSize: '18px',
+    color: 'var(--muted)',
+  },
+  error: {
+    textAlign: 'center',
+    padding: '20px',
+    marginBottom: '20px',
+    backgroundColor: '#FFF3CD',
+    color: '#856404',
+    borderRadius: '8px',
+    border: '1px solid #FFEAA7',
   },
   grid: {
     display: 'grid',
