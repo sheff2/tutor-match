@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -23,6 +24,12 @@ export default function Login() {
 
   return (
     <div style={styles.page}>
+      {/* Header brand/logo to return home */}
+      <header style={styles.header}>
+        <Link to="/" style={styles.brand} aria-label="Go to home">
+          Tutor-Match
+        </Link>
+      </header>
       <div style={styles.container}>
         <div style={styles.card}>
           <h1 style={styles.title}>{isLogin ? 'Welcome Back' : 'Create Account'}</h1>
@@ -100,6 +107,17 @@ const styles = {
     justifyContent: 'center',
     background: 'linear-gradient(180deg, #EBF2FF 0%, #FFFFFF 100%)',
     padding: '24px',
+  },
+  header: {
+    position: 'absolute',
+    top: 16,
+    left: 24,
+  },
+  brand: {
+    fontWeight: 700,
+    letterSpacing: 0.3,
+    color: 'var(--text)',
+    textDecoration: 'none',
   },
   container: {
     width: '100%',
