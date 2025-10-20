@@ -6,6 +6,7 @@ export default function Home() {
       <header style={styles.header}>
         <div style={styles.brand}>Tutor-Match</div>
         <nav style={styles.nav}>
+          <Link to="/tutors" style={styles.link}>Find Tutors</Link>
           <a href="#about" style={styles.link}>About</a>
           <a href="#how" style={styles.link}>How it works</a>
           <a href="#contact" style={styles.link}>Contact</a>
