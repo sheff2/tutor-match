@@ -1,18 +1,106 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function Login() {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     name: '',
+    role: 'student', // 'student' | 'tutor'
+    bio: '',
+    hourlyRate: '',
+    subjects: '', // comma-separated
+    yearsExperience: '',
+    location: '',
+    onlineOnly: 'true', // string for input, convert to boolean
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  const handleSubmit = (e) => {
+  // Safely parse JSON from a fetch Response
+  const safeJson = async (res) => {
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Implement authentication logic
-    console.log(isLogin ? 'Logging in...' : 'Signing up...', formData);
+    setError('');
+    setSuccess('');
+
+    if (isLogin) {
+      setError('Login is not implemented yet. Please use Sign Up.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const { name, email, password, role } = formData;
+
+      if (!name || !email || !password) {
+        setError('Name, email, and password are required.');
+        return;
+      }
+
+      if (role === 'tutor') {
+        // Build tutor payload
+        const payload = {
+          name,
+          email,
+          password,
+          bio: formData.bio || undefined,
+          hourlyRate: formData.hourlyRate ? Number(formData.hourlyRate) : undefined,
+          subjects: formData.subjects
+            ? formData.subjects.split(',').map(s => s.trim()).filter(Boolean)
+            : undefined,
+          yearsExperience: formData.yearsExperience ? Number(formData.yearsExperience) : undefined,
+          location: formData.location || undefined,
+          onlineOnly: formData.onlineOnly === 'true',
+        };
+
+        const res = await fetch('/api/tutors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const data = await safeJson(res);
+          throw new Error(data?.error || 'Failed to create tutor');
+        }
+
+        const data = await res.json();
+        setSuccess('Tutor account created!');
+        // Navigate to the new tutor profile
+        navigate(`/tutor/${data?.tutor?.id ?? ''}`);
+        return;
+      }
+
+      // Default: student/admin go through /api/users
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, role }),
+      });
+
+      if (!res.ok) {
+        const data = await safeJson(res);
+        throw new Error(data?.error || 'Failed to create user');
+      }
+
+      setSuccess('Account created!');
+      navigate('/tutors');
+    } catch (err) {
+      setError(err?.message || 'Something went wrong');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -53,6 +141,22 @@ export default function Login() {
               </div>
             )}
 
+            {!isLogin && (
+              <div style={styles.field}>
+                <label htmlFor="role" style={styles.label}>I am a</label>
+                <select
+                  id="role"
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  style={styles.input}
+                >
+                  <option value="student">Student</option>
+                  <option value="tutor">Tutor</option>
+                </select>
+              </div>
+            )}
+
             <div style={styles.field}>
               <label htmlFor="email" style={styles.label}>Email</label>
               <input
@@ -79,8 +183,94 @@ export default function Login() {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary" style={styles.submitBtn}>
-              {isLogin ? 'Log In' : 'Sign Up'}
+            {/* Tutor-only extra fields */}
+            {!isLogin && formData.role === 'tutor' && (
+              <>
+                <div style={styles.field}>
+                  <label htmlFor="bio" style={styles.label}>Bio (optional)</label>
+                  <textarea
+                    id="bio"
+                    name="bio"
+                    value={formData.bio}
+                    onChange={handleChange}
+                    rows={3}
+                    style={{ ...styles.input, resize: 'vertical' }}
+                  />
+                </div>
+                <div style={styles.row}>
+                  <div style={{ ...styles.field, flex: 1 }}>
+                    <label htmlFor="hourlyRate" style={styles.label}>Hourly Rate (optional)</label>
+                    <input
+                      id="hourlyRate"
+                      name="hourlyRate"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={formData.hourlyRate}
+                      onChange={handleChange}
+                      style={styles.input}
+                    />
+                  </div>
+                  <div style={{ ...styles.field, flex: 1 }}>
+                    <label htmlFor="yearsExperience" style={styles.label}>Years Experience (optional)</label>
+                    <input
+                      id="yearsExperience"
+                      name="yearsExperience"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={formData.yearsExperience}
+                      onChange={handleChange}
+                      style={styles.input}
+                    />
+                  </div>
+                </div>
+                <div style={styles.field}>
+                  <label htmlFor="subjects" style={styles.label}>Subjects (comma-separated, optional)</label>
+                  <input
+                    id="subjects"
+                    name="subjects"
+                    type="text"
+                    placeholder="e.g., Calculus, COP3530, React"
+                    value={formData.subjects}
+                    onChange={handleChange}
+                    style={styles.input}
+                  />
+                </div>
+                <div style={styles.row}>
+                  <div style={{ ...styles.field, flex: 1 }}>
+                    <label htmlFor="location" style={styles.label}>Location (optional)</label>
+                    <input
+                      id="location"
+                      name="location"
+                      type="text"
+                      value={formData.location}
+                      onChange={handleChange}
+                      style={styles.input}
+                    />
+                  </div>
+                  <div style={{ ...styles.field, flex: 1 }}>
+                    <label htmlFor="onlineOnly" style={styles.label}>Online Only?</label>
+                    <select
+                      id="onlineOnly"
+                      name="onlineOnly"
+                      value={formData.onlineOnly}
+                      onChange={handleChange}
+                      style={styles.input}
+                    >
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {error && <div style={styles.error}>{error}</div>}
+            {success && <div style={styles.success}>{success}</div>}
+
+            <button type="submit" className="btn btn-primary" style={styles.submitBtn} disabled={submitting}>
+              {submitting ? (isLogin ? 'Logging in...' : 'Signing up...') : (isLogin ? 'Log In' : 'Sign Up')}
             </button>
           </form>
 
