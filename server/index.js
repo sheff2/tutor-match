@@ -133,73 +133,118 @@ app.post("/api/users", async (req, res) => {
 
 // tutors only, creates their user also
 app.post("/api/tutors", async (req, res) => {
-  const session = await mongoose.startSession();
-  
   try {
     const { name, email, password, bio, hourlyRate, subjects, yearsExperience, location, onlineOnly, avatarUrl } = req.body;
-    
+
     // Validate required fields
     if (!email || !password || !name) {
       return res.status(400).json({ error: "Name, email, and password are required." });
     }
-    
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: "User with this email already exists." });
     }
-    
+
     // Hash password
     const passwordHash = Buffer.from(password).toString("base64");
-    
-    // Start transaction
-    session.startTransaction();
-    
-    // Create User
-    const [user] = await User.create([{
-      role: "tutor",
-      email,
-      passwordHash,
-      name,
-      avatarUrl,
-      skills: subjects,
-    }], { session });
-    
-    // Create TutorProfile
-    const [tutorProfile] = await TutorProfile.create([{
-      userId: user._id,
-      bio,
-      hourlyRate,
-      subjects,
-      yearsExperience,
-      location,
-      onlineOnly,
-    }], { session });
-    
-    await session.commitTransaction();
-    
-    res.status(201).json({
-      message: "Tutor created successfully",
-      tutor: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        bio: tutorProfile.bio,
-        hourlyRate: tutorProfile.hourlyRate,
-        subjects: tutorProfile.subjects,
-        yearsExperience: tutorProfile.yearsExperience,
-        location: tutorProfile.location,
-        onlineOnly: tutorProfile.onlineOnly,
-        avatarUrl: user.avatarUrl,
-      },
-    });
-    
+
+    // In production, use transactions; in dev, skip to support standalone Mongo
+    const useTransactions = process.env.NODE_ENV === "production" && process.env.DEV_NO_TX !== "true";
+
+    if (useTransactions) {
+      const session = await mongoose.startSession();
+      try {
+        session.startTransaction();
+
+        const [user] = await User.create([
+          {
+            role: "tutor",
+            email,
+            passwordHash,
+            name,
+            avatarUrl,
+            skills: subjects,
+          },
+        ], { session });
+
+        const [tutorProfile] = await TutorProfile.create([
+          {
+            userId: user._id,
+            bio,
+            hourlyRate,
+            subjects,
+            yearsExperience,
+            location,
+            onlineOnly,
+          },
+        ], { session });
+
+        await session.commitTransaction();
+
+        return res.status(201).json({
+          message: "Tutor created successfully",
+          tutor: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            bio: tutorProfile.bio,
+            hourlyRate: tutorProfile.hourlyRate,
+            subjects: tutorProfile.subjects,
+            yearsExperience: tutorProfile.yearsExperience,
+            location: tutorProfile.location,
+            onlineOnly: tutorProfile.onlineOnly,
+            avatarUrl: user.avatarUrl,
+          },
+        });
+      } catch (error) {
+        try { await session.abortTransaction(); } catch (_) {}
+        console.error("Error creating tutor (tx):", error);
+        return res.status(500).json({ error: "Failed to create tutor" });
+      } finally {
+        session.endSession();
+      }
+    } else {
+      // No transaction path (dev/local)
+      const user = await User.create({
+        role: "tutor",
+        email,
+        passwordHash,
+        name,
+        avatarUrl,
+        skills: subjects,
+      });
+
+      const tutorProfile = await TutorProfile.create({
+        userId: user._id,
+        bio,
+        hourlyRate,
+        subjects,
+        yearsExperience,
+        location,
+        onlineOnly,
+      });
+
+      return res.status(201).json({
+        message: "Tutor created successfully",
+        tutor: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          bio: tutorProfile.bio,
+          hourlyRate: tutorProfile.hourlyRate,
+          subjects: tutorProfile.subjects,
+          yearsExperience: tutorProfile.yearsExperience,
+          location: tutorProfile.location,
+          onlineOnly: tutorProfile.onlineOnly,
+          avatarUrl: user.avatarUrl,
+        },
+      });
+    }
   } catch (error) {
-    await session.abortTransaction();
     console.error("Error creating tutor:", error);
     res.status(500).json({ error: "Failed to create tutor" });
-  } finally {
-    session.endSession();
   }
 });
 
