@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import User from "./schema/User.js";
 import TutorProfile from "./schema/TutorProfile.js";
+import mongoose from "mongoose";
 
 dotenv.config();
 
@@ -78,6 +79,128 @@ app.get("/api/tutors/sample", (req, res) => {
     t.courses.some(c => c.toLowerCase().includes(q))
   );
   res.json({ results });
+});
+
+// general user creation
+app.post("/api/users", async (req, res) => {
+  try {
+    const { name, email, password, role, avatarUrl } = req.body;
+    
+    // Validate required fields
+    if (!email || !password || !name || !role) {
+      return res.status(400).json({ error: "Name, email, password, and role are required." });
+    }
+    
+    // Validate role (tutors use different route)
+    if (!["student", "admin"].includes(role)) {
+      return res.status(400).json({ error: "Use /api/tutors endpoint for tutor registration." });
+    }
+    
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "User with this email already exists." });
+    }
+    
+    // Hash password
+    const passwordHash = Buffer.from(password).toString("base64");
+    
+    // Create user
+    const user = await User.create({
+      role,
+      email,
+      passwordHash,
+      name,
+      avatarUrl,
+    });
+    
+    res.status(201).json({
+      message: "User created successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+      },
+    });
+    
+  } catch (error) {
+    console.error("Error creating user:", error);
+    res.status(500).json({ error: "Failed to create user" });
+  }
+});
+
+// tutors only, creates their user also
+app.post("/api/tutors", async (req, res) => {
+  const session = await mongoose.startSession();
+  
+  try {
+    const { name, email, password, bio, hourlyRate, subjects, yearsExperience, location, onlineOnly, avatarUrl } = req.body;
+    
+    // Validate required fields
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: "Name, email, and password are required." });
+    }
+    
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "User with this email already exists." });
+    }
+    
+    // Hash password
+    const passwordHash = Buffer.from(password).toString("base64");
+    
+    // Start transaction
+    session.startTransaction();
+    
+    // Create User
+    const [user] = await User.create([{
+      role: "tutor",
+      email,
+      passwordHash,
+      name,
+      avatarUrl,
+      skills: subjects,
+    }], { session });
+    
+    // Create TutorProfile
+    const [tutorProfile] = await TutorProfile.create([{
+      userId: user._id,
+      bio,
+      hourlyRate,
+      subjects,
+      yearsExperience,
+      location,
+      onlineOnly,
+    }], { session });
+    
+    await session.commitTransaction();
+    
+    res.status(201).json({
+      message: "Tutor created successfully",
+      tutor: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        bio: tutorProfile.bio,
+        hourlyRate: tutorProfile.hourlyRate,
+        subjects: tutorProfile.subjects,
+        yearsExperience: tutorProfile.yearsExperience,
+        location: tutorProfile.location,
+        onlineOnly: tutorProfile.onlineOnly,
+        avatarUrl: user.avatarUrl,
+      },
+    });
+    
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("Error creating tutor:", error);
+    res.status(500).json({ error: "Failed to create tutor" });
+  } finally {
+    session.endSession();
+  }
 });
 
 const PORT = process.env.PORT || 5000;
