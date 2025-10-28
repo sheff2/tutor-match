@@ -14,25 +14,39 @@ export default function Tutors() {
   const fetchTutors = async () => {
     try {
       setLoading(true);
-      const port = import.meta.env.VITE_PORT;
-      const response = await fetch(`http://localhost:${port}/api/tutors`);
+      // Use Vite dev proxy for API calls
+      const response = await fetch(`/api/tutors`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch tutors');
       }
       
       const data = await response.json();
-      const results =
-        Array.isArray(data?.results) && data.results.length > 0
-          ? data.results
-          : dummyTutors;
+      // If DB has no tutors yet, fall back to the sample endpoint
+      let results = Array.isArray(data?.results) && data.results.length > 0
+        ? data.results
+        : null;
+
+      if (!results) {
+        try {
+          const sampleRes = await fetch(`/api/tutors/sample`);
+          if (sampleRes.ok) {
+            const sampleData = await sampleRes.json();
+            results = Array.isArray(sampleData?.results) ? sampleData.results : [];
+          } else {
+            results = [];
+          }
+        } catch {
+          results = [];
+        }
+      }
 
       setTutors(results);
     } catch (err) {
       console.error("Error fetching tutors:", err);
       setError(err.message);
-      // fallback to dummy on error
-      setTutors(dummyTutors);
+      // show empty state on error
+      setTutors([]);
     } finally {
       setLoading(false);
     }
