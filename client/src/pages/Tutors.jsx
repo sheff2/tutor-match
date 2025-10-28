@@ -94,7 +94,7 @@ export default function Tutors() {
                       <button
                         className="btn btn-primary"
                         style={styles.bookBtn}
-                        onClick={(e) => e.preventDefault()} // keep Link navigation
+                        //onClick={(e) => e.preventDefault()} // keep Link navigation
                       >
                         View Profile
                       </button>
