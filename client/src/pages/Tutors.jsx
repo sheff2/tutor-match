@@ -15,9 +15,13 @@ export default function Tutors() {
   const fetchTutors = async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:5000/api/tutors");
-      if (!response.ok) throw new Error("Failed to fetch tutors");
-
+      const port = import.meta.env.VITE_PORT;
+      const response = await fetch(`http://localhost:${port}/api/tutors`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch tutors');
+      }
+      
       const data = await response.json();
       const results =
         Array.isArray(data?.results) && data.results.length > 0
