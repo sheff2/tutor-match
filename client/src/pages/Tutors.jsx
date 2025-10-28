@@ -1,7 +1,6 @@
 // client/src/pages/Tutors.jsx
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { dummyTutors } from "../data/dummyTutors";
 
 export default function Tutors() {
   const [tutors, setTutors] = useState([]);
