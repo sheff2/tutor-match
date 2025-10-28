@@ -65,6 +65,36 @@ app.get("/api/tutors", async (req, res) => {
   }
 });
 
+// Get a single tutor by id with profile
+app.get("/api/tutors/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: "Missing id" });
+
+    const user = await User.findOne({ _id: id, role: "tutor" }).lean();
+    if (!user) return res.status(404).json({ error: "Tutor not found" });
+
+    const profile = await TutorProfile.findOne({ userId: user._id }).lean();
+
+    return res.json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      bio: profile?.bio || "No bio available",
+      hourlyRate: profile?.hourlyRate || 0,
+      subjects: profile?.subjects || [],
+      yearsExperience: profile?.yearsExperience || 0,
+      location: profile?.location,
+      onlineOnly: profile?.onlineOnly ?? true,
+      avatarUrl: user.avatarUrl,
+      rating: 4.5,
+    });
+  } catch (error) {
+    console.error("Error fetching tutor by id:", error);
+    return res.status(500).json({ error: "Failed to fetch tutor" });
+  }
+});
+
 // Fallback: sample tutors if DB is empty
 const sampleTutors = [
   { id: 1, name: "Alex Kim", courses: ["CIS4301", "COP3530"], rating: 4.9 },

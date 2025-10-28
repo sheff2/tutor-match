@@ -9,15 +9,25 @@ export default function TutorProfile() {
   useEffect(() => {
     const fetchTutor = async () => {
       try {
-        const port = import.meta.env.VITE_PORT || '3001';
-        const response = await fetch(`http://localhost:${port}/api/tutors`);
-        const data = await response.json();
-        
-        // Find the tutor by id from the results
-        const foundTutor = data.results.find((t) => t.id.toString() === id);
-        setTutor(foundTutor || null);
+        const res = await fetch(`/api/tutors/${id}`);
+        if (!res.ok) throw new Error('Failed to load tutor');
+        const data = await res.json();
+        setTutor({
+          id: data.id,
+          name: data.name,
+          email: data.email,
+          bio: data.bio,
+          hourlyRate: data.hourlyRate,
+          courses: data.subjects,
+          rating: data.rating,
+          yearsExperience: data.yearsExperience,
+          avatarUrl: data.avatarUrl,
+          location: data.location,
+          onlineOnly: data.onlineOnly,
+        });
       } catch (err) {
         console.error("Error fetching tutor:", err);
+        setTutor(null);
       } finally {
         setLoading(false);
       }
