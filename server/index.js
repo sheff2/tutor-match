@@ -6,6 +6,7 @@ import User from "./schema/User.js";
 import TutorProfile from "./schema/TutorProfile.js";
 import authRoutes from "./routes/auth.js";
 import { verifyToken } from "./middleware/auth.js";
+import mongoose from "mongoose";
 
 dotenv.config();
 
@@ -21,7 +22,7 @@ app.use(express.json());
 
 // Request logging middleware (after body parser)
 app.use((req, res, next) => {
-  console.log(`📨 [${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(` [${new Date().toISOString()}] ${req.method} ${req.url}`);
   if (req.body && Object.keys(req.body).length > 0) {
     const bodyLog = { ...req.body };
     if (bodyLog.password) bodyLog.password = '***';
@@ -102,5 +103,129 @@ app.get("/api/tutors/sample", (req, res) => {
   res.json({ results });
 });
 
-const PORT = process.env.PORT || 3000;
+// general user creation
+app.post("/api/users", async (req, res) => {
+  try {
+    const { name, email, password, role, avatarUrl } = req.body;
+    
+    // Validate required fields
+    if (!email || !password || !name || !role) {
+      return res.status(400).json({ error: "Name, email, password, and role are required." });
+    }
+    
+    // Validate role (tutors use different route)
+    if (!["student", "admin"].includes(role)) {
+      return res.status(400).json({ error: "Use /api/tutors endpoint for tutor registration." });
+    }
+    
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "User with this email already exists." });
+    }
+    
+    // Hash password
+     const saltRounds = 10;
+     const passwordHash = await bcrypt.hash(password, saltRounds);
+    
+    // Create user
+    const user = await User.create({
+      role,
+      email,
+      passwordHash,
+      name,
+      avatarUrl,
+    });
+    
+    res.status(201).json({
+      message: "User created successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+      },
+    });
+    
+  } catch (error) {
+    console.error("Error creating user:", error);
+    res.status(500).json({ error: "Failed to create user" });
+  }
+});
+
+// tutors only, creates their user also
+app.post("/api/tutors", async (req, res) => {
+  const session = await mongoose.startSession();
+  
+  try {
+    const { name, email, password, bio, hourlyRate, subjects, yearsExperience, location, onlineOnly, avatarUrl } = req.body;
+    
+    // Validate required fields
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: "Name, email, and password are required." });
+    }
+    
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "User with this email already exists." });
+    }
+    
+    // Hash password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+    
+    // Start transaction
+    session.startTransaction();
+    
+    // Create User
+    const [user] = await User.create([{
+      role: "tutor",
+      email,
+      passwordHash,
+      name,
+      avatarUrl,
+      skills: subjects,
+    }], { session });
+    
+    // Create TutorProfile
+    const [tutorProfile] = await TutorProfile.create([{
+      userId: user._id,
+      bio,
+      hourlyRate,
+      subjects,
+      yearsExperience,
+      location,
+      onlineOnly,
+    }], { session });
+    
+    await session.commitTransaction();
+    
+    res.status(201).json({
+      message: "Tutor created successfully",
+      tutor: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        bio: tutorProfile.bio,
+        hourlyRate: tutorProfile.hourlyRate,
+        subjects: tutorProfile.subjects,
+        yearsExperience: tutorProfile.yearsExperience,
+        location: tutorProfile.location,
+        onlineOnly: tutorProfile.onlineOnly,
+        avatarUrl: user.avatarUrl,
+      },
+    });
+    
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("Error creating tutor:", error);
+    res.status(500).json({ error: "Failed to create tutor" });
+  } finally {
+    session.endSession();
+  }
+});
+
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`API listening on http://localhost:${PORT}`));
