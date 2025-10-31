@@ -4,23 +4,45 @@ import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import User from "./schema/User.js";
 import TutorProfile from "./schema/TutorProfile.js";
+import authRoutes from "./routes/auth.js";
+import { verifyToken } from "./middleware/auth.js";
 
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// CORS configuration - allow requests from frontend
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true,
+}));
+
 app.use(express.json());
+
+// Request logging middleware (after body parser)
+app.use((req, res, next) => {
+  console.log(`📨 [${new Date().toISOString()}] ${req.method} ${req.url}`);
+  if (req.body && Object.keys(req.body).length > 0) {
+    const bodyLog = { ...req.body };
+    if (bodyLog.password) bodyLog.password = '***';
+    console.log('   Body:', bodyLog);
+  }
+  next();
+});
 
 // Connect to MongoDB
 connectDB();
+
+// Auth routes
+app.use("/api/auth", authRoutes);
 
 // simple routes
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "tutor-match", time: new Date().toISOString() });
 });
 
-// Get all tutors with their profiles
-app.get("/api/tutors", async (req, res) => {
+// Get all tutors with their profiles (protected route)
+app.get("/api/tutors", verifyToken, async (req, res) => {
   try {
     const q = (req.query.q || "").toString().toLowerCase();
     
@@ -80,5 +102,5 @@ app.get("/api/tutors/sample", (req, res) => {
   res.json({ results });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API listening on http://localhost:${PORT}`));

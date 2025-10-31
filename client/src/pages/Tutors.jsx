@@ -1,19 +1,35 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+
+// Use proxy for API calls (vite will forward /api to backend)
+const API_BASE = '';
 
 export default function Tutors() {
   const [tutors, setTutors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchTutors();
   }, []);
 
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
   const fetchTutors = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/api/tutors');
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/api/tutors`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch tutors');
@@ -54,7 +70,10 @@ export default function Tutors() {
         <nav style={styles.nav}>
           <Link to="/" style={styles.link}>Home</Link>
           <Link to="/tutors" style={styles.link}>Find Tutors</Link>
-          <Link to="/login" style={styles.link}>Login</Link>
+          <span style={styles.userName}>Hi, {user?.name}!</span>
+          <button onClick={handleLogout} style={styles.logoutBtn}>
+            Logout
+          </button>
         </nav>
       </header>
 
@@ -148,11 +167,27 @@ const styles = {
   nav: {
     display: 'flex',
     gap: 16,
+    alignItems: 'center',
   },
   link: {
     color: 'var(--text)',
     textDecoration: 'none',
     transition: 'color 0.2s',
+  },
+  userName: {
+    color: 'var(--text)',
+    fontSize: '14px',
+    fontWeight: '500',
+  },
+  logoutBtn: {
+    background: 'none',
+    border: '1px solid var(--border)',
+    color: 'var(--text)',
+    padding: '6px 12px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    transition: 'all 0.2s',
   },
   main: {
     flex: '1 0 auto',

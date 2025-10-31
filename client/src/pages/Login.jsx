@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -8,11 +9,37 @@ export default function Login() {
     password: '',
     name: '',
   });
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e) => {
+  const { login, register } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Implement authentication logic
-    console.log(isLogin ? 'Logging in...' : 'Signing up...', formData);
+    setLoading(true);
+    setErrorMessage('');
+
+    try {
+      let result;
+
+      if (isLogin) {
+        result = await login(formData.email, formData.password);
+      } else {
+        result = await register(formData.email, formData.password, formData.name);
+      }
+
+      if (result.success) {
+        // Redirect to tutors page after successful login/signup
+        navigate('/tutors');
+      } else {
+        setErrorMessage(result.error || 'Authentication failed');
+      }
+    } catch (error) {
+      setErrorMessage('An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -36,6 +63,12 @@ export default function Login() {
           <p style={styles.subtitle}>
             {isLogin ? 'Log in to continue to Tutor-Match' : 'Sign up to get started'}
           </p>
+
+          {errorMessage && (
+            <div style={styles.error}>
+              {errorMessage}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} style={styles.form}>
             {!isLogin && (
@@ -79,8 +112,13 @@ export default function Login() {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary" style={styles.submitBtn}>
-              {isLogin ? 'Log In' : 'Sign Up'}
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={styles.submitBtn}
+              disabled={loading}
+            >
+              {loading ? 'Loading...' : (isLogin ? 'Log In' : 'Sign Up')}
             </button>
           </form>
 
@@ -140,6 +178,16 @@ const styles = {
     color: 'var(--muted)',
     textAlign: 'center',
     marginBottom: '24px',
+  },
+  error: {
+    padding: '12px',
+    borderRadius: '4px',
+    backgroundColor: '#fee',
+    color: '#c33',
+    fontSize: '14px',
+    textAlign: 'center',
+    marginBottom: '16px',
+    border: '1px solid #fcc',
   },
   form: {
     display: 'flex',
