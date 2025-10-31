@@ -1,6 +1,9 @@
 import { useParams, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 
+const API_BASE = '';
+
+
 export default function TutorProfile() {
   const { id } = useParams();
   const [tutor, setTutor] = useState(null);
@@ -9,8 +12,12 @@ export default function TutorProfile() {
   useEffect(() => {
     const fetchTutor = async () => {
       try {
-        const port = import.meta.env.VITE_PORT || '3001';
-        const response = await fetch(`http://localhost:${port}/api/tutors`);
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE}/api/tutors`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
         const data = await response.json();
         
         // Find the tutor by id from the results
