@@ -8,7 +8,8 @@ export default function Login() {
     email: '',
     password: '',
     name: '',
-  });
+    role: 'student', // default
+    });
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -26,12 +27,16 @@ export default function Login() {
       if (isLogin) {
         result = await login(formData.email, formData.password);
       } else {
-        result = await register(formData.email, formData.password, formData.name);
+        result = await register(
+          formData.email,
+          formData.password,
+          formData.name,
+          formData.role
+          );
       }
 
       if (result.success) {
-        // Redirect to tutors page after successful login/signup
-        navigate('/tutors');
+        navigate(formData.role === 'tutor' ? '/profile' : '/tutors');
       } else {
         setErrorMessage(result.error || 'Authentication failed');
       }
@@ -73,6 +78,33 @@ export default function Login() {
           <form onSubmit={handleSubmit} style={styles.form}>
             {!isLogin && (
               <div style={styles.field}>
+                <label style={styles.label}>Sign up as</label>
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <label>
+                    <input
+                      type="radio"
+                      name="role"
+                      value="student"
+                      checked={formData.role === 'student'}
+                      onChange={handleChange}
+                    />{' '}
+                    Student
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="role"
+                      value="tutor"
+                      checked={formData.role === 'tutor'}
+                      onChange={handleChange}
+                    />{' '}
+                    Tutor
+                  </label>
+                </div>
+              </div>
+            )}
+            {!isLogin && (
+              <div style={styles.field}>
                 <label htmlFor="name" style={styles.label}>Name</label>
                 <input
                   id="name"
@@ -82,6 +114,7 @@ export default function Login() {
                   onChange={handleChange}
                   required
                   style={styles.input}
+                  autoComplete="name"
                 />
               </div>
             )}

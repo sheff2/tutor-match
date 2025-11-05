@@ -16,10 +16,7 @@ export default function Tutors() {
     fetchTutors();
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
+  const handleLogout = () => navigate('/logout');
 
   const fetchTutors = async () => {
     try {
@@ -59,6 +56,7 @@ export default function Tutors() {
         <nav style={styles.nav}>
           <Link to="/" style={styles.link}>Home</Link>
           <Link to="/tutors" style={styles.link}>Find Tutors</Link>
+          <Link to="/profile" style={styles.link}>Profile</Link> 
           <span style={styles.userName}>Hi, {user?.name}!</span>
           <button onClick={handleLogout} style={styles.logoutBtn}>
             Logout
