@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import bcrypt from "bcrypt";
 import { connectDB } from "./config/db.js";
 import User from "./schema/User.js";
 import TutorProfile from "./schema/TutorProfile.js";
@@ -219,11 +220,13 @@ app.post("/api/tutors", async (req, res) => {
     });
     
   } catch (error) {
-    await session.abortTransaction();
+    if (session && session.inTransaction()) {
+      await session.abortTransaction();
+}
     console.error("Error creating tutor:", error);
     res.status(500).json({ error: "Failed to create tutor" });
   } finally {
-    session.endSession();
+    if (session) session.endSession();
   }
 });
 

@@ -1,6 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 
+
 const API_BASE = '';
 
 
@@ -8,7 +9,21 @@ export default function TutorProfile() {
   const { id } = useParams();
   const [tutor, setTutor] = useState(null);
   const [loading, setLoading] = useState(true);
-
+  function Header() {
+    return (
+    <header style={styles.header}>
+    <Link to="/" style={styles.brand}>Tutor-Match</Link>
+    <nav style={styles.nav}>
+    <Link to="/" style={styles.link}>Home</Link>
+    <Link to="/tutors" style={styles.link}>Find Tutors</Link>
+    </nav>
+    <nav style={styles.nav}>
+    <Link to="/profile" style={styles.link}>Profile</Link>
+    <Link to="/logout" style={styles.link}>Logout</Link>
+    </nav>
+    </header>
+    );
+    }
   useEffect(() => {
     const fetchTutor = async () => {
       try {
@@ -36,14 +51,7 @@ export default function TutorProfile() {
   if (loading) {
     return (
       <div style={styles.page}>
-        <header style={styles.header}>
-          <Link to="/" style={styles.brand}>Tutor-Match</Link>
-          <nav style={styles.nav}>
-            <Link to="/" style={styles.link}>Home</Link>
-            <Link to="/tutors" style={styles.link}>Find Tutors</Link>
-            <Link to="/login" style={styles.link}>Login</Link>
-          </nav>
-        </header>
+        <Header />
         <main style={styles.main}>
           <div style={styles.container}>
             <h1>Loading...</h1>
@@ -56,14 +64,7 @@ export default function TutorProfile() {
     if (!tutor) {
     return (
       <div style={styles.page}>
-        <header style={styles.header}>
-          <Link to="/" style={styles.brand}>Tutor-Match</Link>
-          <nav style={styles.nav}>
-            <Link to="/" style={styles.link}>Home</Link>
-            <Link to="/tutors" style={styles.link}>Find Tutors</Link>
-            <Link to="/login" style={styles.link}>Login</Link>
-          </nav>
-        </header>
+        <Header />
         <main style={styles.main}>
           <div style={styles.container}>
             <h1 style={{ color: "var(--text)" }}>Tutor not found</h1>
@@ -84,14 +85,7 @@ export default function TutorProfile() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <Link to="/" style={styles.brand}>Tutor-Match</Link>
-        <nav style={styles.nav}>
-          <Link to="/" style={styles.link}>Home</Link>
-          <Link to="/tutors" style={styles.link}>Find Tutors</Link>
-          <Link to="/login" style={styles.link}>Login</Link>
-        </nav>
-      </header>
+      <Header />
 
       <main style={styles.main}>
         <div style={styles.container}>

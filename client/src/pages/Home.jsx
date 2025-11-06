@@ -1,15 +1,35 @@
 import { Link } from 'react-router-dom';
-
+import {useAuth} from "../context/AuthContext";
 export default function Home() {
+  const { user } = useAuth(); // section to see if authenticated
+  // because you couldn't go to tutors on the homepage if you were logged
+  // in so i fixed that here
+  const isAuthenticated = !!user;
+
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <div style={styles.brand}>Tutor-Match</div>
+        {/* left side */ }
+        <Link to="/" style={styles.brand}>Tutor-Match</Link>
+
+        {/* center portion */}
         <nav style={styles.nav}>
-          <Link to="/tutors" style={styles.link}>Find Tutors</Link>
           <a href="#about" style={styles.link}>About</a>
           <a href="#how" style={styles.link}>How it works</a>
           <a href="#contact" style={styles.link}>Contact</a>
+        </nav>
+
+        {/* auth/navigation right side */}
+        <nav style={styles.nav}>
+          <Link to="/tutors" style={styles.link}>Find Tutors</Link>
+          {isAuthenticated ? (
+            <>
+              <Link to="/profile" style={styles.link}>Profile</Link>
+              <Link to="/logout" style={styles.link}>Logout</Link>
+            </>
+          ) : (
+            <Link to="/login" style={styles.link}>Login</Link>
+          )}
         </nav>
       </header>
 
@@ -21,7 +41,7 @@ export default function Home() {
             Find help fast. A clean, simple space for students and tutors.
           </p>
           <div style={styles.ctaRow}>
-            <Link className="btn btn-primary" to="/login">Get Started</Link>
+            <Link className="btn btn-primary" to={isAuthenticated ? '/tutors' : '/login'}> Get Started </Link>
             <a className="btn btn-secondary" href="#how">Learn more</a>
           </div>
         </div>
@@ -74,7 +94,7 @@ const styles = {
     top: 0,
     zIndex: 10,
   },
-  brand: { fontWeight: 700, letterSpacing: 0.3, color: 'var(--text)' },
+  brand: { fontWeight: 700, letterSpacing: 0.3, color: 'var(--text)', textDecoration: 'none' },
   nav: { display: 'flex', gap: 16 },
   link: { color: 'var(--text)', textDecoration: 'none' },
 
