@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../schema/User.js";
+import TutorProfile from "../schema/TutorProfile.js";
 
 const router = express.Router();
 
@@ -45,6 +46,35 @@ router.post("/register", async (req, res) => {
 
     await user.save();
     console.log('[AUTH] User saved to database:', user._id);
+
+    // If registering as a tutor, create an empty or provided TutorProfile immediately
+    if ((role || 'student') === 'tutor') {
+      try {
+        const {
+          bio = '',
+          hourlyRate,
+          subjects,
+          yearsExperience,
+          location,
+          onlineOnly,
+        } = req.body || {};
+
+        const profileDoc = new TutorProfile({
+          userId: user._id,
+          bio,
+          hourlyRate: typeof hourlyRate === 'number' ? hourlyRate : (hourlyRate ? Number(hourlyRate) : undefined),
+          subjects: Array.isArray(subjects) ? subjects : (typeof subjects === 'string' ? subjects.split(',').map(s => s.trim()).filter(Boolean) : []),
+          yearsExperience: typeof yearsExperience === 'number' ? yearsExperience : (yearsExperience ? Number(yearsExperience) : undefined),
+          location,
+          onlineOnly: typeof onlineOnly === 'boolean' ? onlineOnly : true,
+        });
+        await profileDoc.save();
+        console.log('[AUTH] Tutor profile created for', user._id);
+      } catch (e) {
+        console.warn('[AUTH] Tutor profile creation failed but user created:', e?.message);
+        // Do not fail overall registration if profile creation fails
+      }
+    }
 
     // Generate JWT token
     console.log('[AUTH] Generating JWT token...');

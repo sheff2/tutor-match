@@ -5,6 +5,8 @@ import bcrypt from "bcrypt";
 import { connectDB } from "./config/db.js";
 import User from "./schema/User.js";
 import TutorProfile from "./schema/TutorProfile.js";
+import Booking from "./schema/Bookings.js";
+import Slot from "./schema/TimeSlots.js";
 import authRoutes from "./routes/auth.js";
 import { verifyToken } from "./middleware/auth.js";
 import mongoose from "mongoose";
@@ -42,7 +44,41 @@ app.use("/api/auth", authRoutes);
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "tutor-match", time: new Date().toISOString() });
 });
+app.patch('/api/users/me', verifyToken, async (req, res) => {
+  try {
+    // Allow updating avatarUrl and/or bio
+    const { avatarUrl, bio } = req.body;
 
+    if ((avatarUrl === undefined || avatarUrl === null || (typeof avatarUrl === 'string' && !avatarUrl.trim()))
+        && (bio === undefined || bio === null)) {
+      return res.status(400).json({ error: 'Provide avatarUrl and/or bio to update' });
+    }
+
+    const update = {};
+    if (avatarUrl !== undefined) update.avatarUrl = avatarUrl;
+    if (bio !== undefined) update.bio = bio;
+
+    const user = await User
+      .findByIdAndUpdate(req.user.userId, update, { new: true })
+      .select('_id name email role avatarUrl bio');
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+        bio: user.bio,
+      },
+    });
+  } catch (err) {
+    console.error('Update profile error:', err);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
 // Get all tutors with their profiles (protected route)
 app.get("/api/tutors", verifyToken, async (req, res) => {
   try {
@@ -85,6 +121,77 @@ app.get("/api/tutors", verifyToken, async (req, res) => {
   } catch (error) {
     console.error("Error fetching tutors:", error);
     res.status(500).json({ error: "Failed to fetch tutors" });
+  }
+});
+
+// Get current tutor profile (merged user + tutor profile)
+app.get('/api/tutors/me', verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).lean();
+    if (!user || user.role !== 'tutor') {
+      return res.status(404).json({ error: 'Tutor not found' });
+    }
+    const profile = await TutorProfile.findOne({ userId: user._id }).lean();
+    res.json({
+      tutor: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+        bio: profile?.bio || '',
+        hourlyRate: profile?.hourlyRate || null,
+        subjects: profile?.subjects || [],
+        yearsExperience: profile?.yearsExperience || null,
+        location: profile?.location || '',
+        onlineOnly: profile?.onlineOnly ?? true,
+      }
+    });
+  } catch (e) {
+    console.error('Fetch tutor me error', e);
+    res.status(500).json({ error: 'Failed to load tutor profile' });
+  }
+});
+
+// Update (finish) current tutor profile
+app.patch('/api/tutors/me', verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).lean();
+    if (!user || user.role !== 'tutor') {
+      return res.status(403).json({ error: 'Not a tutor account' });
+    }
+    const { bio, hourlyRate, subjects, yearsExperience, location, onlineOnly } = req.body;
+
+    const update = {};
+    if (bio !== undefined) update.bio = bio;
+    if (hourlyRate !== undefined) update.hourlyRate = hourlyRate;
+    if (subjects !== undefined) update.subjects = subjects;
+    if (yearsExperience !== undefined) update.yearsExperience = yearsExperience;
+    if (location !== undefined) update.location = location;
+    if (onlineOnly !== undefined) update.onlineOnly = onlineOnly;
+
+    const profile = await TutorProfile.findOneAndUpdate(
+      { userId: user._id },
+      { $set: update },
+      { upsert: true, new: true }
+    ).lean();
+
+    res.json({
+      tutor: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+        bio: profile.bio,
+        hourlyRate: profile.hourlyRate,
+        subjects: profile.subjects,
+        yearsExperience: profile.yearsExperience,
+        location: profile.location,
+        onlineOnly: profile.onlineOnly,
+      }
+    });
+  } catch (e) {
+    console.error('Update tutor profile error', e);
+    res.status(500).json({ error: 'Failed to update tutor profile' });
   }
 });
 
@@ -227,6 +334,231 @@ app.post("/api/tutors", async (req, res) => {
     res.status(500).json({ error: "Failed to create tutor" });
   } finally {
     if (session) session.endSession();
+  }
+});
+
+// Bookings
+// Create a booking (student creates a booking with a tutor)
+app.post('/api/bookings', verifyToken, async (req, res) => {
+  try {
+    const { tutorId, slotId, price } = req.body;
+    const studentId = req.user.userId;
+
+    if (!tutorId || !slotId) {
+      return res.status(400).json({ error: 'tutorId and slotId are required' });
+    }
+
+    // Ensure tutor exists
+    const tutor = await User.findById(tutorId).lean();
+    if (!tutor || tutor.role !== 'tutor') {
+      return res.status(400).json({ error: 'Invalid tutorId' });
+    }
+
+    // Reserve the slot atomically: only mark as booked if currently not booked
+    const slot = await Slot.findOneAndUpdate({ _id: slotId, isBooked: false }, { $set: { isBooked: true } }, { new: true });
+    if (!slot) {
+      return res.status(400).json({ error: 'Slot is already booked or does not exist' });
+    }
+
+    // Calculate price based on slot duration and tutor's hourly rate if not provided
+    let bookingPrice = price;
+    if (!bookingPrice) {
+      const tutorProfile = await TutorProfile.findOne({ userId: tutorId }).lean();
+      if (tutorProfile?.hourlyRate && slot?.start && slot?.end) {
+        // Calculate duration in hours
+        const durationMs = new Date(slot.end) - new Date(slot.start);
+        const durationHours = durationMs / (1000 * 60 * 60);
+        // Calculate total price
+        bookingPrice = Math.round(tutorProfile.hourlyRate * durationHours * 100) / 100; // Round to 2 decimal places
+      }
+    }
+
+    const booking = await Booking.create({
+      tutorId,
+      studentId,
+      slotId,
+      price: bookingPrice,
+    });
+
+    res.status(201).json({ booking });
+  } catch (e) {
+    console.error('Create booking error', e);
+    res.status(500).json({ error: 'Failed to create booking' });
+  }
+});
+
+// Get bookings for current user (student or tutor)
+app.get('/api/bookings/me', verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).lean();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    let query = {};
+    if (user.role === 'tutor') query.tutorId = user._id;
+    else query.studentId = user._id;
+
+    const bookings = await Booking.find(query)
+      .sort({ createdAt: -1 })
+      .populate('tutorId', 'name email avatarUrl')
+      .populate('studentId', 'name email avatarUrl')
+      .populate('slotId')
+      .lean();
+
+    res.json({ bookings });
+  } catch (e) {
+    console.error('Fetch bookings error', e);
+    res.status(500).json({ error: 'Failed to load bookings' });
+  }
+});
+
+  // List available slots for a tutor (or all slots)
+  app.get('/api/slots', verifyToken, async (req, res) => {
+    try {
+        const tutorId = req.query.tutorId;
+        const includeBooked = (req.query.includeBooked || '').toString().toLowerCase() === 'true' || req.query.includeBooked === '1';
+        const q = {};
+        if (tutorId) q.tutorId = tutorId;
+        // Only return non-booked slots by default, unless includeBooked is set
+        if (!includeBooked) q.isBooked = false;
+
+      const slots = await Slot.find(q).sort({ start: 1 }).lean();
+      res.json({ slots });
+    } catch (e) {
+      console.error('Fetch slots error', e);
+      res.status(500).json({ error: 'Failed to load slots' });
+    }
+  });
+
+  // Create a slot (tutor only)
+  app.post('/api/slots', verifyToken, async (req, res) => {
+    try {
+      const user = await User.findById(req.user.userId).lean();
+      if (!user || user.role !== 'tutor') return res.status(403).json({ error: 'Only tutors can create slots' });
+
+      const { start, end } = req.body;
+      if (!start || !end) return res.status(400).json({ error: 'start and end are required' });
+
+      const s = new Date(start);
+      const e = new Date(end);
+      if (isNaN(s) || isNaN(e) || s >= e) return res.status(400).json({ error: 'Invalid start/end times' });
+
+      const slot = await Slot.create({ tutorId: user._id, start: s, end: e });
+      res.status(201).json({ slot });
+    } catch (err) {
+      console.error('Create slot error', err);
+      res.status(500).json({ error: 'Failed to create slot' });
+    }
+  });
+
+  app.post('/api/slots/bulk', verifyToken, async (req, res) => {
+    try {
+      const user = await User.findById(req.user.userId).lean();
+      if (!user || user.role !== 'tutor') {
+        return res.status(403).json({ error: 'Only tutors can create slots' });
+      }
+
+      const { slots, startDate: bulkStartDate, endDate: bulkEndDate } = req.body;
+
+      if (!Array.isArray(slots) || slots.length === 0) {
+        return res.status(400).json({ error: 'Slots array is required' });
+      }
+
+      const slotsToInsert = slots.map(slot => ({
+        tutorId: user._id,
+        start: slot.start,
+        end: slot.end,
+      }));
+
+      const createdSlots = await Slot.insertMany(slotsToInsert);
+      res.status(201).json({ slots: createdSlots });
+    } catch (error) {
+      console.error('Bulk create slots error', error);
+      res.status(400).json({ error: 'Failed to create slots', details: error.message });
+    }
+  });
+
+  // Update a slot (tutor only, owner)
+  app.patch('/api/slots/:id', verifyToken, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.userId;
+      const slot = await Slot.findById(id);
+      if (!slot) return res.status(404).json({ error: 'Slot not found' });
+      if (String(slot.tutorId) !== String(userId)) return res.status(403).json({ error: 'Not authorized' });
+
+      const { start, end, isBooked } = req.body;
+      if (start !== undefined) {
+        const s = new Date(start);
+        if (isNaN(s)) return res.status(400).json({ error: 'Invalid start' });
+        slot.start = s;
+      }
+      if (end !== undefined) {
+        const e = new Date(end);
+        if (isNaN(e)) return res.status(400).json({ error: 'Invalid end' });
+        slot.end = e;
+      }
+      if (isBooked !== undefined) slot.isBooked = !!isBooked;
+
+      await slot.save();
+      res.json({ slot });
+    } catch (err) {
+      console.error('Update slot error', err);
+      res.status(500).json({ error: 'Failed to update slot' });
+    }
+  });
+
+  // Delete a slot (tutor only, owner)
+  app.delete('/api/slots/:id', verifyToken, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.userId;
+      const slot = await Slot.findById(id);
+      if (!slot) return res.status(404).json({ error: 'Slot not found' });
+      if (String(slot.tutorId) !== String(userId)) return res.status(403).json({ error: 'Not authorized' });
+
+      await slot.deleteOne();
+      res.json({ ok: true });
+    } catch (err) {
+      console.error('Delete slot error', err);
+      res.status(500).json({ error: 'Failed to delete slot' });
+    }
+  });
+
+// Update a booking (status, notes, times) - only tutor or student involved can change
+app.patch('/api/bookings/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+    const allowed = ['status', 'price'];
+    const update = {};
+    for (const k of allowed) {
+      if (req.body[k] !== undefined) update[k] = req.body[k];
+    }
+
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    // Only tutor or student on the booking can modify
+    if (String(booking.tutorId) !== String(userId) && String(booking.studentId) !== String(userId)) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    Object.assign(booking, update);
+    await booking.save();
+
+    // If booking was canceled (or declined), free the slot
+    if (update.status && ['cancelled', 'declined'].includes(String(update.status).toLowerCase())) {
+      try {
+        if (booking.slotId) await Slot.findByIdAndUpdate(booking.slotId, { $set: { isBooked: false } });
+      } catch (e) {
+        console.error('Failed to free slot after booking status change', e);
+      }
+    }
+
+    res.json({ booking });
+  } catch (e) {
+    console.error('Update booking error', e);
+    res.status(500).json({ error: 'Failed to update booking' });
   }
 });
 
