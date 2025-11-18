@@ -9,6 +9,10 @@ export default function Login() {
     password: '',
     name: '',
     role: 'student', // default
+    bio: '',
+    hourlyRate: '',
+    subjects: '', // comma list
+    yearsExperience: '',
     });
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -27,12 +31,22 @@ export default function Login() {
       if (isLogin) {
         result = await login(formData.email, formData.password);
       } else {
+        const extra = formData.role === 'tutor' ? {
+          bio: formData.bio,
+          hourlyRate: formData.hourlyRate ? Number(formData.hourlyRate) : undefined,
+          subjects: formData.subjects
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean),
+          yearsExperience: formData.yearsExperience ? Number(formData.yearsExperience) : undefined,
+        } : {};
         result = await register(
           formData.email,
           formData.password,
           formData.name,
-          formData.role
-          );
+          formData.role,
+          extra
+        );
       }
 
       if (result.success) {
@@ -40,7 +54,7 @@ export default function Login() {
       } else {
         setErrorMessage(result.error || 'Authentication failed');
       }
-    } catch (error) {
+    } catch {
       setErrorMessage('An unexpected error occurred');
     } finally {
       setLoading(false);
@@ -117,6 +131,63 @@ export default function Login() {
                   autoComplete="name"
                 />
               </div>
+            )}
+            {/* Tutor extra fields */}
+            {!isLogin && formData.role === 'tutor' && (
+              <>
+                <div style={styles.field}>
+                  <label htmlFor="bio" style={styles.label}>Bio</label>
+                  <textarea
+                    id="bio"
+                    name="bio"
+                    rows={3}
+                    value={formData.bio}
+                    onChange={handleChange}
+                    style={styles.textarea}
+                    placeholder="Short intro students will see"
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div style={styles.field}>
+                    <label htmlFor="hourlyRate" style={styles.label}>Hourly Rate ($)</label>
+                    <input
+                      id="hourlyRate"
+                      name="hourlyRate"
+                      type="number"
+                      min="0"
+                      value={formData.hourlyRate}
+                      onChange={handleChange}
+                      style={styles.input}
+                      placeholder="25"
+                    />
+                  </div>
+                  <div style={styles.field}>
+                    <label htmlFor="yearsExperience" style={styles.label}>Years Experience</label>
+                    <input
+                      id="yearsExperience"
+                      name="yearsExperience"
+                      type="number"
+                      min="0"
+                      value={formData.yearsExperience}
+                      onChange={handleChange}
+                      style={styles.input}
+                      placeholder="2"
+                    />
+                  </div>
+                </div>
+                <div style={styles.field}>
+                  <label htmlFor="subjects" style={styles.label}>Subjects (comma separated)</label>
+                  <input
+                    id="subjects"
+                    name="subjects"
+                    type="text"
+                    value={formData.subjects}
+                    onChange={handleChange}
+                    style={styles.input}
+                    placeholder="Algebra, Physics"
+                  />
+                </div>
+              </>
             )}
 
             <div style={styles.field}>
@@ -246,6 +317,16 @@ const styles = {
     color: 'var(--text)',
     outline: 'none',
     transition: 'border-color 0.2s',
+  },
+  textarea: {
+    padding: '10px 12px',
+    borderRadius: '4px',
+    border: '1px solid var(--border)',
+    fontSize: '14px',
+    background: 'var(--bg)',
+    color: 'var(--text)',
+    outline: 'none',
+    resize: 'vertical'
   },
   submitBtn: {
     marginTop: '8px',

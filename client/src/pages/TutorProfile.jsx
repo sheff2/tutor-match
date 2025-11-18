@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
+import Avatar from "../components/Avatar";
 
 
 const API_BASE = '';
@@ -9,6 +10,8 @@ export default function TutorProfile() {
   const { id } = useParams();
   const [tutor, setTutor] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [slots, setSlots] = useState([]);
+  const [bookingMsg, setBookingMsg] = useState(null);
   function Header() {
     return (
     <header style={styles.header}>
@@ -38,6 +41,18 @@ export default function TutorProfile() {
         // Find the tutor by id from the results
         const foundTutor = data.results.find((t) => t.id.toString() === id);
         setTutor(foundTutor || null);
+        // fetch slots for this tutor separately
+        if (foundTutor) {
+          try {
+            const slotsRes = await fetch(`${API_BASE}/api/slots?tutorId=${foundTutor.id}`, {
+              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+            });
+            const slotsData = await slotsRes.json();
+            if (slotsRes.ok) setSlots(slotsData.slots || []);
+          } catch (e) {
+            console.error('Failed to fetch slots', e);
+          }
+        }
       } catch (err) {
         console.error("Error fetching tutor:", err);
       } finally {
@@ -93,7 +108,7 @@ export default function TutorProfile() {
 
           <div style={styles.profileCard}>
             <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-              <div style={styles.avatar}>{tutor.name.charAt(0)}</div>
+              <Avatar name={tutor.name} src={tutor.avatarUrl} size={56} />
               <div>
                 <h1 style={{ margin: 0, color: "var(--text)" }}>{tutor.name}</h1>
                 <div style={{ color: "var(--muted)", marginTop: 4 }}>
@@ -116,10 +131,10 @@ export default function TutorProfile() {
 
           <section style={styles.section}>
             <h2 style={styles.h2}>Available time slots</h2>
-            {tutor.slots && tutor.slots.length > 0 ? (
+            {slots && slots.length > 0 ? (
               <div style={styles.slotGrid}>
-                {tutor.slots.map((s) => (
-                  <div key={s.id} style={styles.slotCard}>
+                {slots.map((s) => (
+                  <div key={s._id || s.id} style={styles.slotCard}>
                     <div style={{ fontWeight: 600, color: "var(--text)" }}>
                       {fmt(s.start)} – {fmt(s.end)}
                     </div>
@@ -136,7 +151,31 @@ export default function TutorProfile() {
                         background: s.isBooked ? "#eee" : "var(--card)",
                         cursor: s.isBooked ? "not-allowed" : "pointer",
                       }}
-                      onClick={() => alert(`(Demo) Booking ${tutor.name} at ${fmt(s.start)}`)}
+                      onClick={async () => {
+                        try {
+                          setBookingMsg(null);
+                          const res = await fetch('/api/bookings', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              Authorization: `Bearer ${localStorage.getItem('token')}`,
+                            },
+                            body: JSON.stringify({ tutorId: tutor.id, slotId: s._id || s.id }),
+                          });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.error || 'Booking failed');
+                          setBookingMsg('Booking created — check My Bookings');
+                          // refresh slots
+                          const slotsRes = await fetch(`${API_BASE}/api/slots?tutorId=${tutor.id}`, {
+                            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                          });
+                          const slotsData = await slotsRes.json();
+                          if (slotsRes.ok) setSlots(slotsData.slots || []);
+                        } catch (e) {
+                          console.error('Booking error', e);
+                          setBookingMsg(e.message || 'Booking failed');
+                        }
+                      }}
                     >
                       {s.isBooked ? "Not available" : "Book this slot"}
                     </button>
@@ -146,6 +185,7 @@ export default function TutorProfile() {
             ) : (
               <p style={{ color: "var(--muted)" }}>No available time slots yet</p>
             )}
+            {bookingMsg && <p style={{ marginTop: 12, color: 'var(--primary)' }}>{bookingMsg}</p>}
           </section>
         </div>
       </main>

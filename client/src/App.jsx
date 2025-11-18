@@ -7,6 +7,7 @@ import Tutors from './pages/Tutors';
 import TutorProfile from './pages/TutorProfile';
 import Profile from './pages/Profile';
 import Logout from './pages/Logout';
+import Bookings from './pages/Bookings';
 
 export default function App() {
   return (
@@ -26,6 +27,14 @@ export default function App() {
             }
           />
           <Route
+            path="/bookings"
+            element={
+              <ProtectedRoute>
+                <Bookings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/tutor/:id"
             element={
             <ProtectedRoute>
@@ -33,7 +42,7 @@ export default function App() {
             </ProtectedRoute>
             }
             />
-        <Route path="/tutor/:id" element={<TutorProfile />} />
+        {/** Removed duplicate unprotected /tutor/:id route that could cause double fetch & flicker */}
         </Routes>
       </Router>
     </AuthProvider>

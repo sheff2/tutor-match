@@ -11,12 +11,17 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  avatarUrl: {
+    type: String,
+    default: '',
+  },
   passwordHash: {
     type: String,
     required: true,
   },
   name: String,
-  avatarUrl: String,
+  
+  bio: { type: String, default: '' },
   skills: [String], // optional for tutors
   createdAt: {
     type: Date,

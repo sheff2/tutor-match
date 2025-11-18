@@ -53,9 +53,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (email, password, name, role = 'student') => {
+  const register = async (email, password, name, role = 'student', extra = {}) => {
     setError(null);
-    console.log('[FRONTEND] Register request:', { email, name, role });
+    console.log('[FRONTEND] Register request:', { email, name, role, extra });
 
     try {
       const response = await fetch(`${API_BASE}/api/auth/register`, {
@@ -63,7 +63,8 @@ export const AuthProvider = ({ children }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, name, role }),
+  // Allow passing tutor-specific fields when role === 'tutor'.
+  body: JSON.stringify({ email, password, name, role, ...extra }),
       });
 
       console.log('[FRONTEND] Register response status:', response.status, response.statusText);
@@ -137,11 +138,117 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error: err.message };
     }
   };
+  
 
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
     setError(null);
+  };
+    // Update profile info stored on the User document (students or generic user fields)
+  const updateUserProfile = async ({ bio, avatarUrl }) => {
+    setError(null);
+    const token = localStorage.getItem('token');
+    if (!token) return { success: false, error: 'Not authenticated' };
+
+    // build body with only provided fields
+    const body = {};
+    if (bio !== undefined) body.bio = bio;
+    if (avatarUrl !== undefined) body.avatarUrl = avatarUrl;
+
+    if (Object.keys(body).length === 0) {
+      return { success: false, error: 'No fields to update' };
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/users/me`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        throw new Error('Invalid server response');
+      }
+
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Failed to update profile' };
+      }
+
+      // update AuthContext user so UI updates immediately
+      setUser(data.user);
+      return { success: true, user: data.user };
+    } catch (err) {
+      console.error('updateUserProfile error:', err);
+      setError(err.message);
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Update tutor-specific profile fields. Server returns merged tutor object.
+  const updateTutorProfile = async (payload = {}) => {
+    setError(null);
+    const token = localStorage.getItem('token');
+    if (!token) return { success: false, error: 'Not authenticated' };
+
+    // Only allow sending fields we know the server accepts; filter undefined
+    const allowed = ['bio', 'hourlyRate', 'subjects', 'yearsExperience', 'location', 'onlineOnly'];
+    const body = {};
+    allowed.forEach((k) => {
+      if (payload[k] !== undefined) body[k] = payload[k];
+    });
+
+    if (Object.keys(body).length === 0) {
+      return { success: false, error: 'No tutor fields to update' };
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/tutors/me`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        throw new Error('Invalid server response');
+      }
+
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Failed to update tutor profile' };
+      }
+
+      // server returns { tutor: { ... } }. Keep AuthContext.user consistent for common fields.
+      const tutor = data.tutor;
+      // Only patch the parts of user object we care about (avatarUrl, bio)
+      setUser((u) => {
+        if (!u) return u;
+        return {
+          ...u,
+          avatarUrl: tutor.avatarUrl ?? u.avatarUrl,
+          bio: tutor.bio ?? u.bio ?? '',
+        };
+      });
+
+      return { success: true, tutor };
+    } catch (err) {
+      console.error('updateTutorProfile error:', err);
+      setError(err.message);
+      return { success: false, error: err.message };
+    }
   };
 
   const value = {
@@ -152,6 +259,8 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     isAuthenticated: !!user,
+    updateUserProfile,
+    updateTutorProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -9,7 +9,7 @@ export default function Tutors() {
   const [tutors, setTutors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -36,14 +36,14 @@ export default function Tutors() {
       const results =
         Array.isArray(data?.results) && data.results.length > 0
           ? data.results
-          : dummyTutors;
+          : [];
 
       setTutors(results);
     } catch (err) {
       console.error("Error fetching tutors:", err);
       setError(err.message);
-      // fallback to dummy on error
-      setTutors(dummyTutors);
+      // fallback to empty array on error
+      setTutors([]);
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,8 @@ export default function Tutors() {
         <nav style={styles.nav}>
           <Link to="/" style={styles.link}>Home</Link>
           <Link to="/tutors" style={styles.link}>Find Tutors</Link>
-          <Link to="/profile" style={styles.link}>Profile</Link> 
+          <Link to="/profile" style={styles.link}>Profile</Link>
+          <Link to="/bookings" style={styles.link}>My Bookings</Link>
           <span style={styles.userName}>Hi, {user?.name}!</span>
           <button onClick={handleLogout} style={styles.logoutBtn}>
             Logout
@@ -131,24 +132,26 @@ export default function Tutors() {
 }
 
 const styles = {
-  page: { minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)" },
+  page: { minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f7fafc" },
   header: {
     width: "100%",
-    padding: "16px 24px",
-    borderBottom: "1px solid var(--border)",
+    padding: "16px 32px",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    background: "var(--card)",
+    background: "#fff",
     position: "sticky",
     top: 0,
-    zIndex: 10,
+    zIndex: 20,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    borderBottom: "1px solid #e2e8f0",
   },
   brand: {
     fontWeight: 700,
     letterSpacing: 0.3,
-    color: 'var(--text)',
+    color: '#667eea',
     textDecoration: 'none',
+    fontSize: 20,
   },
   nav: {
     display: 'flex',
@@ -156,23 +159,25 @@ const styles = {
     alignItems: 'center',
   },
   link: {
-    color: 'var(--text)',
+    color: '#4a5568',
     textDecoration: 'none',
     transition: 'color 0.2s',
+    fontSize: 15,
   },
   userName: {
-    color: 'var(--text)',
+    color: '#4a5568',
     fontSize: '14px',
     fontWeight: '500',
   },
   logoutBtn: {
-    background: 'none',
-    border: '1px solid var(--border)',
-    color: 'var(--text)',
-    padding: '6px 12px',
-    borderRadius: '4px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    border: 'none',
+    color: '#fff',
+    padding: '8px 16px',
+    borderRadius: '8px',
     cursor: 'pointer',
     fontSize: '14px',
+    fontWeight: 600,
     transition: 'all 0.2s',
   },
   main: {
@@ -186,12 +191,13 @@ const styles = {
   title: {
     fontSize: '36px',
     margin: '0 0 8px',
-    color: 'var(--text)',
+    color: '#2d3748',
     textAlign: 'center',
+    fontWeight: 700,
   },
   subtitle: {
     fontSize: '16px',
-    color: 'var(--muted)',
+    color: '#718096',
     textAlign: 'center',
     marginBottom: '40px',
   },
@@ -199,7 +205,7 @@ const styles = {
     textAlign: 'center',
     padding: '40px',
     fontSize: '18px',
-    color: 'var(--muted)',
+    color: '#718096',
   },
   error: {
     textAlign: "center",
@@ -210,40 +216,53 @@ const styles = {
     borderRadius: "8px",
     border: "1px solid #FFEAA7",
   },
-  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "24px" },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "24px" },
   card: {
-    background: "var(--card)",
-    border: "1px solid var(--border)",
-    borderRadius: "8px",
-    padding: "20px",
+    background: "#fff",
+    border: "1px solid #e2e8f0",
+    borderRadius: "12px",
+    padding: "24px",
     display: "flex",
     flexDirection: "column",
     gap: "12px",
-    transition: "box-shadow 0.2s, transform 0.05s",
+    transition: "all 0.3s ease",
     cursor: "pointer",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
   },
   cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  tutorName: { fontSize: "20px", margin: 0, color: "var(--text)" },
-  rating: { fontSize: "14px", color: "var(--text)" },
-  bio: { fontSize: "14px", color: "var(--muted)", margin: 0, lineHeight: 1.5 },
+  tutorName: { fontSize: "20px", margin: 0, color: "#2d3748", fontWeight: 600 },
+  rating: { fontSize: "14px", color: "#4a5568" },
+  bio: { fontSize: "14px", color: "#718096", margin: 0, lineHeight: 1.6 },
   courses: { display: "flex", flexWrap: "wrap", gap: "8px" },
   courseBadge: {
-    background: "#EBF2FF",
-    color: "var(--primary)",
-    padding: "4px 10px",
-    borderRadius: "12px",
+    background: "linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%)",
+    color: "#667eea",
+    padding: "6px 12px",
+    borderRadius: "16px",
     fontSize: "12px",
-    fontWeight: 500,
+    fontWeight: 600,
   },
   cardFooter: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
-    marginTop: "8px", paddingTop: "12px", borderTop: "1px solid var(--border)",
+    marginTop: "8px", paddingTop: "12px", borderTop: "1px solid #e2e8f0",
   },
-  rate: { fontSize: "18px", fontWeight: 600, color: "var(--text)" },
-  bookBtn: { fontSize: "14px", padding: "8px 16px" },
+  rate: { fontSize: "18px", fontWeight: 700, color: "#2d3748" },
+  bookBtn: { 
+    fontSize: "14px", 
+    padding: "10px 20px",
+    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    color: "#fff",
+    border: "none",
+    borderRadius: "8px",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
   footer: {
-    flex: "0 0 auto", borderTop: "1px solid var(--border)",
-    padding: "24px", textAlign: "center", background: "var(--card)",
+    flex: "0 0 auto", 
+    borderTop: "1px solid #e2e8f0",
+    padding: "24px", 
+    textAlign: "center", 
+    background: "#fff",
   },
-  footerText: { margin: 0, fontSize: "12px", color: "var(--muted)" },
+  footerText: { margin: 0, fontSize: "12px", color: "#718096" },
 };
