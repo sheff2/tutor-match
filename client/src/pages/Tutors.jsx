@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import StarRating from '../components/StarRating';
 
 // Use proxy for API calls (vite will forward /api to backend)
 const API_BASE = '';
@@ -91,7 +92,13 @@ export default function Tutors() {
                   <div style={styles.card}>
                     <div style={styles.cardHeader}>
                       <h3 style={styles.tutorName}>{tutor.name}</h3>
-                      <div style={styles.rating}>⭐ {tutor.rating}</div>
+                      <div style={styles.rating}>
+                        {tutor.rating ? (
+                          <StarRating rating={tutor.rating} size={16} />
+                        ) : (
+                          <span style={{ fontSize: 13, color: '#718096' }}>No reviews yet</span>
+                        )}
+                      </div>
                     </div>
 
                     <p style={styles.bio}>{tutor.bio}</p>
