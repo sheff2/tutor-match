@@ -419,36 +419,38 @@ export default function Profile() {
               </div>
             )}
 
-            {/* Inline bio on the left card. For students, edit in-place on the card. */}
-            <div style={{ marginTop: 24, textAlign: 'left' }}>
-              <div style={{ color: '#718096', fontSize: 12, marginBottom: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>About</div>
-              {editing === 'bio' ? (
-                <InlineBioEditor 
-                  initialBio={user?.bio} 
-                  onSaved={() => setEditing(null)} 
-                  onCancel={() => setEditing(null)} 
-                  isTutor={false}
-                />
-              ) : (
-                <div>
-                  <div style={{ marginBottom: 12, lineHeight: 1.6, color: '#4a5568' }}>{user?.bio || 'No bio yet.'}</div>
-                  <button 
-                    onClick={() => setEditing('bio')} 
-                    className="btn" 
-                    style={{ 
-                      fontSize: 13, 
-                      padding: '6px 12px',
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 8,
-                    }}
-                  >
-                    Edit Bio
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Inline bio on the left card - only for students */}
+            {user?.role !== 'tutor' && (
+              <div style={{ marginTop: 24, textAlign: 'left' }}>
+                <div style={{ color: '#718096', fontSize: 12, marginBottom: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>About</div>
+                {editing === 'bio' ? (
+                  <InlineBioEditor 
+                    initialBio={user?.bio} 
+                    onSaved={() => setEditing(null)} 
+                    onCancel={() => setEditing(null)} 
+                    isTutor={false}
+                  />
+                ) : (
+                  <div>
+                    <div style={{ marginBottom: 12, lineHeight: 1.6, color: '#4a5568' }}>{user?.bio || 'No bio yet.'}</div>
+                    <button 
+                      onClick={() => setEditing('bio')} 
+                      className="btn" 
+                      style={{ 
+                        fontSize: 13, 
+                        padding: '6px 12px',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 8,
+                      }}
+                    >
+                      Edit Bio
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div style={{ marginTop: 24 }}>
               <Link to="/tutors" className="btn btn-primary" style={{ 

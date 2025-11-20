@@ -7,6 +7,7 @@ import User from "./schema/User.js";
 import TutorProfile from "./schema/TutorProfile.js";
 import Booking from "./schema/Bookings.js";
 import Slot from "./schema/TimeSlots.js";
+import Review from "./schema/Review.js";
 import authRoutes from "./routes/auth.js";
 import { verifyToken } from "./middleware/auth.js";
 import mongoose from "mongoose";
@@ -103,6 +104,13 @@ app.get("/api/tutors", verifyToken, async (req, res) => {
     const tutorsWithProfiles = await Promise.all(
       tutors.map(async (tutor) => {
         const profile = await TutorProfile.findOne({ userId: tutor._id }).lean();
+        
+        // Calculate average rating from reviews
+        const reviews = await Review.find({ revieweeId: tutor._id }).lean();
+        const avgRating = reviews.length > 0
+          ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+          : 0;
+        
         return {
           id: tutor._id,
           name: tutor.name,
@@ -110,7 +118,7 @@ app.get("/api/tutors", verifyToken, async (req, res) => {
           bio: profile?.bio || "No bio available",
           hourlyRate: profile?.hourlyRate || 0,
           courses: profile?.subjects || [],
-          rating: 4.5, // TODO: Calculate from bookings/reviews
+          rating: avgRating > 0 ? Math.round(avgRating * 10) / 10 : null,
           yearsExperience: profile?.yearsExperience || 0,
           avatarUrl: tutor.avatarUrl,
         };
@@ -399,8 +407,8 @@ app.get('/api/bookings/me', verifyToken, async (req, res) => {
 
     const bookings = await Booking.find(query)
       .sort({ createdAt: -1 })
-      .populate('tutorId', 'name email avatarUrl')
-      .populate('studentId', 'name email avatarUrl')
+      .populate('tutorId', 'name email avatarUrl _id')
+      .populate('studentId', 'name email avatarUrl _id')
       .populate('slotId')
       .lean();
 
@@ -559,6 +567,115 @@ app.patch('/api/bookings/:id', verifyToken, async (req, res) => {
   } catch (e) {
     console.error('Update booking error', e);
     res.status(500).json({ error: 'Failed to update booking' });
+  }
+});
+
+// Reviews
+// Create a review for a completed booking
+app.post('/api/reviews', verifyToken, async (req, res) => {
+  try {
+    const { bookingId, rating, comment } = req.body;
+    const reviewerId = req.user.userId;
+
+    if (!bookingId || !rating) {
+      return res.status(400).json({ error: 'bookingId and rating are required' });
+    }
+
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+
+    // Verify booking exists and is completed
+    const booking = await Booking.findById(bookingId).lean();
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (booking.status !== 'completed') {
+      return res.status(400).json({ error: 'Can only review completed bookings' });
+    }
+
+    // Verify user is part of the booking
+    const isTutor = String(booking.tutorId) === String(reviewerId);
+    const isStudent = String(booking.studentId) === String(reviewerId);
+    
+    if (!isTutor && !isStudent) {
+      return res.status(403).json({ error: 'Not authorized to review this booking' });
+    }
+
+    // Determine who is being reviewed
+    const revieweeId = isTutor ? booking.studentId : booking.tutorId;
+
+    // Check if review already exists
+    const existingReview = await Review.findOne({ bookingId, reviewerId }).lean();
+    if (existingReview) {
+      return res.status(400).json({ error: 'You have already reviewed this booking' });
+    }
+
+    // Create review
+    const review = await Review.create({
+      bookingId,
+      reviewerId,
+      revieweeId,
+      rating,
+      comment: comment || '',
+    });
+
+    // Populate reviewer and reviewee info
+    const populatedReview = await Review.findById(review._id)
+      .populate('reviewerId', 'name avatarUrl')
+      .populate('revieweeId', 'name avatarUrl')
+      .lean();
+
+    res.status(201).json({ review: populatedReview });
+  } catch (e) {
+    console.error('Create review error', e);
+    res.status(500).json({ error: 'Failed to create review' });
+  }
+});
+
+// Get reviews for a user (tutors typically)
+app.get('/api/reviews/:userId', verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const reviews = await Review.find({ revieweeId: userId })
+      .sort({ createdAt: -1 })
+      .populate('reviewerId', 'name avatarUrl')
+      .populate('bookingId')
+      .lean();
+
+    // Calculate average rating
+    const avgRating = reviews.length > 0
+      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+      : 0;
+
+    res.json({ 
+      reviews, 
+      avgRating: Math.round(avgRating * 10) / 10, // Round to 1 decimal
+      totalReviews: reviews.length 
+    });
+  } catch (e) {
+    console.error('Fetch reviews error', e);
+    res.status(500).json({ error: 'Failed to load reviews' });
+  }
+});
+
+// Get review for a specific booking by current user
+app.get('/api/reviews/booking/:bookingId', verifyToken, async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const reviewerId = req.user.userId;
+
+    const review = await Review.findOne({ bookingId, reviewerId })
+      .populate('reviewerId', 'name avatarUrl')
+      .populate('revieweeId', 'name avatarUrl')
+      .lean();
+
+    res.json({ review });
+  } catch (e) {
+    console.error('Fetch booking review error', e);
+    res.status(500).json({ error: 'Failed to load review' });
   }
 });
 
